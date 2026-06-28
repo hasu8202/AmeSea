@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AMESEA：ネオン深海のユウタ</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="phase3.css">
 </head>
 <body>
   <main id="game-shell">
@@ -20,14 +21,24 @@
       </div>
       <div class="hud-right">
         <strong id="depth-text">深度：0m</strong>
+        <span id="zone-name">ネオン浅層</span>
         <span id="time-text">00:00</span>
         <span>夢の欠片 <b id="dream-text">0</b></span>
         <span>撃破 <b id="kill-text">0</b></span>
         <span id="event-status" class="hidden"></span>
       </div>
+      <aside id="mission-hud" aria-label="ダイブミッション">
+        <b>MISSION</b>
+        <div id="mission-list"></div>
+      </aside>
+      <aside id="synergy-hud" aria-label="発動中のシナジー">
+        <b>SYNERGY</b>
+        <div id="synergy-list"><span class="empty">未発動</span></div>
+      </aside>
       <div id="boss-hud" class="hidden">
-        <b>承認欲求クラゲ・キング</b>
+        <b id="boss-name">承認欲求クラゲ・キング</b>
         <div class="boss-meter"><i id="boss-bar"></i></div>
+        <small id="boss-phase"></small>
       </div>
       <div id="ability-strip">
         <div id="ability-neon"><kbd>E</kbd><span>ポジティブ・ネオン</span><small>READY</small></div>
@@ -38,11 +49,13 @@
 
     <div id="message" class="hidden"></div>
     <div id="quote" class="hidden"></div>
+    <div id="notification-stack" aria-live="polite"></div>
+    <div id="zone-banner" class="hidden" aria-live="assertive"></div>
     <div id="boss-warning" class="hidden"><small>WARNING / DEPTH 300m</small><b>承認欲求クラゲ・キング</b></div>
 
     <section id="start-screen" class="overlay">
       <div class="panel hero-panel">
-        <div class="eyebrow">DEEP SEA ACTION ROGUELITE</div>
+        <div class="eyebrow">DEEP SEA ACTION ROGUELITE / DEVELOPMENT 3</div>
         <h1><span>AMESEA</span><small>ネオン深海のユウタ</small></h1>
         <p class="story">
           深海に落ちたユウタ・アメシー。<br>
@@ -50,11 +63,25 @@
           なぜなら、彼の自己肯定感は水圧より強かったから。
         </p>
         <p class="core-copy">光れば強くなる。<em>でも、光れば敵も寄ってくる。</em></p>
+        <div class="difficulty-picker" role="radiogroup" aria-label="難易度">
+          <button class="difficulty-option" data-difficulty="casual" role="radio" aria-checked="false">
+            <b>CASUAL</b><small>優しい水圧・報酬少なめ</small>
+          </button>
+          <button class="difficulty-option selected" data-difficulty="normal" role="radio" aria-checked="true">
+            <b>NORMAL</b><small>標準バランス</small>
+          </button>
+          <button class="difficulty-option" data-difficulty="deep" role="radio" aria-checked="false">
+            <b>DEEP</b><small>高水圧・レア報酬増加</small>
+          </button>
+        </div>
         <div class="title-actions">
           <button id="start-button" class="primary">深海へダイブ</button>
           <button id="title-tree-button" class="secondary">夢ツリー</button>
+          <button id="achievements-button" class="secondary">実績</button>
+          <button id="bestiary-button" class="secondary">深海図鑑</button>
         </div>
         <div id="title-record" class="save-summary"></div>
+        <div id="difficulty-records" class="difficulty-records"></div>
         <div class="controls">
           <span><kbd>WASD / ↑↓←→</kbd> 移動</span>
           <span><kbd>マウス / Space</kbd> 攻撃</span>
@@ -87,9 +114,24 @@
         <div id="tree-routes"></div>
         <div id="tree-feedback" role="status"></div>
         <div class="tree-actions">
-          <button id="tree-close-button" class="primary">戻る</button>
+          <button id="tree-close-button" class="primary">タイトルへ戻る</button>
           <button id="reset-save-button" class="danger">セーブデータ初期化</button>
         </div>
+      </div>
+    </section>
+
+    <section id="archive-screen" class="overlay hidden">
+      <div class="panel archive-panel">
+        <div class="archive-header">
+          <div>
+            <div id="archive-eyebrow" class="eyebrow">LONG-TERM RECORDS</div>
+            <h2 id="archive-title">実績</h2>
+          </div>
+          <div id="archive-progress"></div>
+        </div>
+        <div id="archive-tabs" class="archive-tabs hidden"></div>
+        <div id="archive-content" class="archive-grid"></div>
+        <button id="archive-close-button" class="primary">タイトルへ戻る</button>
       </div>
     </section>
 
@@ -99,9 +141,13 @@
         <h2>ネオン、沈黙。</h2>
         <div id="result-rank" class="result-rank">C</div>
         <blockquote id="result-quote"></blockquote>
+        <div class="result-badges">
+          <span id="result-difficulty">NORMAL</span>
+          <span id="result-zone">ネオン浅層</span>
+        </div>
         <div class="result-grid">
           <div><span>今回の深度</span><b id="result-depth">0m</b></div>
-          <div><span>最高深度</span><b id="result-best-depth">0m</b></div>
+          <div><span>難易度別最高</span><b id="result-best-depth">0m</b></div>
           <div><span>今回の撃破</span><b id="result-kills">0</b></div>
           <div><span>累計撃破</span><b id="result-total-kills">0</b></div>
           <div><span>今回の欠片</span><b id="result-dreams">0</b></div>
@@ -109,8 +155,12 @@
           <div><span>レベル</span><b id="result-level">1</b></div>
           <div><span>プレイ時間</span><b id="result-time">00:00</b></div>
         </div>
+        <div class="result-detail-columns">
+          <section><h3>ミッション</h3><div id="result-missions"></div></section>
+          <section><h3>発動シナジー</h3><div id="result-synergies"></div></section>
+        </div>
         <div class="result-actions">
-          <button id="restart-button" class="primary">もう一度潜る <kbd>R</kbd></button>
+          <button id="restart-button" class="primary">同じ難易度でもう一度 <kbd>R</kbd></button>
           <button id="result-tree-button" class="secondary">夢ツリーへ</button>
           <button id="title-button" class="secondary">タイトルへ</button>
         </div>
@@ -118,5 +168,6 @@
     </section>
   </main>
   <script src="main.js"></script>
+  <script src="phase3.js"></script>
 </body>
 </html>
